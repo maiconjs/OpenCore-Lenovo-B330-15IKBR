@@ -39,14 +39,14 @@ OpenCore EFI for the **Lenovo B330-15IKBR (81M1)** running **macOS Ventura 13.7.
 |---|---|---|
 | Lilu | 1.7.3 | Patching framework |
 | VirtualSMC + SMCProcessor + SMCBatteryManager | 1.3.9 | SMC emulation, CPU sensors, battery |
-| WhateverGreen | 1.7.2 | iGPU framebuffer and HDMI |
+| WhateverGreen | 1.7.2 | iGPU framebuffer, HDMI and RPS control (`rps-control`) |
 | AppleALC | 1.9.9 (layout 21 build) | Audio, see [Audio](#audio) |
-| CPUFriend + CPUFriendDataProvider | 1.3.0 / 1.0.1 | CPU frequency profile (i3-7020U only) |
+| CPUFriend + CPUFriendDataProvider | 1.3.0 / 1.0.1 | CPU frequency profile (i3-7020U only): 800 MHz floor, EPP `0x40`, 1600 MHz cap in Low Power Mode |
 | ECEnabler | 1.0.6 | Reads 16-bit EC fields for battery info |
 | YogaSMC | 1.5.3 | Lenovo EC: battery conservation mode, sensors, hotkeys |
 | BrightnessKeys | 1.0.4 | Fn brightness keys |
 | VoodooI2C + VoodooRMI (+ RMII2C) | 2.9.1 / 1.4.3 | I2C trackpad with native multitouch gestures |
-| VoodooI2CHID | 1.0 | Fallback HID driver for the trackpad |
+| VoodooI2CHID | 1.0 | Disabled by default; fallback HID driver for the trackpad |
 | VoodooPS2Controller | 2.3.8 | Keyboard only (mouse and trackpad plugins disabled) |
 | RealtekRTL8111 | 2.4.2 | Ethernet |
 | USBToolBox + UTBMap | 1.2.0 / 1.1 | USB port map (9 ports) |
@@ -56,13 +56,14 @@ OpenCore EFI for the **Lenovo B330-15IKBR (81M1)** running **macOS Ventura 13.7.
 | SSDT | Purpose |
 |---|---|
 | SSDT-PLUG | Enables XCPM (`plugin-type`) |
-| SSDT-EC, SSDT-USBX | Fake EC for macOS and USB power properties |
+| SSDT-EC, SSDT-USBX | Fake `EC` device for macOS (the native `EC0` is left untouched) and USB power properties |
 | SSDT-PNLF | Backlight control |
 | SSDT-ALS0 | Fake ambient light sensor (keeps brightness settings) |
 | SSDT-GPI0 | Enables the GPIO controller for the I2C trackpad |
 | SSDT-XOSI | Windows OSI so the I2C trackpad is exposed |
 | SSDT-GPRW | Prevents instant wake from USB/HDA (with `GPRW` to `XPRW` rename) |
-| SSDT-SBUS, SSDT-MCHC | SMBus and memory controller devices |
+| SSDT-SBUS, SSDT-MCHC | SMBus (`BUS0` + `DVL0`, loads AppleSMBusController) and memory controller devices |
+| SSDT-HPET | HPET on IRQ 0 and 8, like a real Mac, with `HPET`/`IPIC`/`RTC`/`TIMR` IRQ patches (generated with [SSDTTime](https://github.com/corpnewt/SSDTTime)) |
 
 ## Status
 
@@ -230,7 +231,7 @@ sudo rm -f /var/vm/sleepimage
 The B330-15IKBR was also sold with 8th-gen Kaby Lake-R CPUs (for example i5-8250U, with UHD 620).
 
 - `CPUFriendDataProvider.kext` is specific to the **i3-7020U**. On any other CPU, disable `CPUFriend.kext` and `CPUFriendDataProvider.kext` or generate your own data with [CPUFriendFriend](https://github.com/corpnewt/CPUFriendFriend).
-- The framebuffer (`AAPL,ig-platform-id 0x591B0000`) generally works for UHD 620 as well, but this was only tested on HD 620.
+- The framebuffer (`AAPL,ig-platform-id 0x591B0000`, HDMI patched on connector 1) generally works for UHD 620 as well, but this was only tested on HD 620.
 
 ## Troubleshooting
 
@@ -238,7 +239,7 @@ The B330-15IKBR was also sold with 8th-gen Kaby Lake-R CPUs (for example i5-8250
 Some receivers advertise an interlaced mode (1080i) as the preferred timing in their EDID. macOS then picks 1080i, and HDMI audio does not work in that mode. Select a 1080p 60 Hz mode in *System Settings > Displays*. If it does not stick, install a display override with the 1080p mode as the preferred timing under `/Library/Displays/Contents/Resources/Overrides/`.
 
 **Trackpad stops working**
-Disable `VoodooRMI.kext`, its `VoodooInput.kext` and `RMII2C.kext`, then enable `VoodooI2C.kext/Contents/PlugIns/VoodooInput.kext`. The trackpad will fall back to VoodooI2CHID.
+Disable `VoodooRMI.kext`, its `VoodooInput.kext` and `RMII2C.kext`, then enable `VoodooI2C.kext/Contents/PlugIns/VoodooInput.kext` and `VoodooI2CHID.kext`. The trackpad will fall back to VoodooI2CHID.
 
 **Boot hangs with the chime enabled**
 Disable `UEFI > Audio > AudioSupport` and the `AudioDxe.efi` driver.
